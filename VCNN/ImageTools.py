@@ -36,7 +36,7 @@ def array_to_image(myarray, cmap='default'):
 	myarray = deprocess_image(myarray)
 
 	f = 255
-	if(cmap == 'gray'):
+	if(cmap == 'grey'):
 		return Image.fromarray(np.uint8(cm.gray(myarray)*f))
 	elif(cmap == 'jet'):
 		return Image.fromarray(np.uint8(cm.jet(myarray)*f))
