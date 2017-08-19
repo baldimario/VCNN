@@ -11,5 +11,6 @@
 - Layers->... (Visualize the selected layer activations)
 
 # Screenshots
-![Alt text](https://image.prntscr.com/image/tZ0d-kwYQlKNbOQSMQGCGA.png "Screenshot 1")
-![Alt text](https://image.prntscr.com/image/8nP0tvP8Sq_mN9NEsMIoyA.png "Screenshot 2")
+![Alt text](https://image.prntscr.com/image/MraW4L8tRdqkJGIVWIFW6w.png "Screenshot 1")
+![Alt text](https://image.prntscr.com/image/7y_qxp-hSpuGmadGvnvfGw.png "Screenshot 2")
+![Alt text](https://image.prntscr.com/image/6NoFPl_LST6DKvF0ZHQFWQ.png "Screenshot 3")

@@ -21,10 +21,10 @@ def cam_shot(input_shape, mirror=True, save=True, save_name='cam_input.png'):
 	img = img[0:height, delta:width-delta] #crop the image
 	img = cv2.resize(img, (x, y)) #resize the image
 
-	img = np.asarray(img)
-	img = Image.fromarray(img)
+	img2 = np.asarray(img)
+	img = Image.fromarray(img2)
 
 	if save: #if save flag it's true save the image
 		cv2.imwrite(save_name, np.asarray(img))
 
-	return img
+	return np.asarray(img)

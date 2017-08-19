@@ -9,7 +9,7 @@ import time
 from keras.applications import vgg16
 from keras import backend as K
 
-import tkinter
+import tkinter as tk
 from tkinter import *
 from tkinter import messagebox as mbox
 from tkinter import filedialog
@@ -25,14 +25,16 @@ from pylab import cm
 import matplotlib.pyplot as plt
 
 from VCNN.Webcam import cam_shot
-from VCNN.Core import predict, summary, load_model, get_activations, max_activation, get_activations_images, get_input_shape
+from VCNN.Core import get_network_input, summary, load_model, get_activations, max_activation, get_activations_images, get_input_shape
+from VCNN.ImageTools import array_to_image
+
 
 class VCNN(Frame):
 	w = 600
 	h = 600
-	h5 = '' #'models\\VGG16\\vgg16.h5'
-	json = '' #'models\\VGG16\\vgg16.json'
-	image = '' #'models\\VGG16\\cat.jpg'
+	h5 = ''
+	json = ''
+	image = ''
 	model = None
 	layersMenu = None
 	cmap = 'default'
@@ -41,7 +43,8 @@ class VCNN(Frame):
 	frame = None
 	menubar = None
 	network_input = None
-	debug = False #True
+	debug = True
+	streamcam = None
 
 	def __init__(self):
 		super().__init__()
@@ -53,8 +56,12 @@ class VCNN(Frame):
 		self.pack(fill=BOTH, expand=1)
 		self.centerWindow()
 
+		def bind_key(event):
+			self.reload_layer
 		#content frame
 		self.frame = Frame(self)
+		self.frame.focus_set()
+		self.frame.bind("<Control_L>", bind_key)   #Binds the "left" key to the frame and exexutes yourFunction if "left" key was pressed
 		self.frame.pack(side=TOP, fill=BOTH, expand=YES)
 
 		#menu bar
@@ -90,7 +97,7 @@ class VCNN(Frame):
 
 		#sources menu
 		sourcesMenu = Menu()
-		sourcesMenu.add_cascade(label='Webcam', command=self.camShot)
+		sourcesMenu.add_cascade(label='Webcam Photo', command=self.camShot)
 		menubar.add_cascade(label='Sources', menu=sourcesMenu)
 
 		#color map menu
@@ -100,6 +107,7 @@ class VCNN(Frame):
 		cmapMenu.add_command(label='Reds', command=lambda: self.setCmap('Reds'))
 		cmapMenu.add_command(label='Greens', command=lambda: self.setCmap('Greens'))
 		cmapMenu.add_command(label='Blues', command=lambda: self.setCmap('Blues'))
+		cmapMenu.add_command(label='Viridis', command=lambda: self.setCmap('viridis'))
 		cmapMenu.add_command(label='Default', command=lambda: self.setCmap('default'))
 		menubar.add_cascade(label='Cmap', menu=cmapMenu)
 
@@ -143,6 +151,10 @@ class VCNN(Frame):
 		if(self.last_loaded_layer != ''):
 			self.loadLayer(self.last_loaded_layer)
 
+	def reload_layer(self):
+		if(self.last_loaded_layer != ''):
+			self.loadLayer(self.last_loaded_layer)
+
 	#show the model summary
 	def summary(self):
 		#check if the model is loaded
@@ -166,20 +178,42 @@ class VCNN(Frame):
 			mbox.showerror("Error", "Please import an adeguate image file")
 			return
 
-		self.network_input = predict(self.model, self.image)
+		self.network_input = get_network_input(self.model, self.image)
+
+		self.reload_layer()
 
 		#prompt the user
 		if(not silent):
-			mbox.showinfo("Info", 'Input predicted')
+			mbox.showinfo("Info", 'Input Computated')
 
 	#clear all the images in the main content frame
 	def cleanImages(self):
 		for img in self.images:
 			img.destroy()
 
+	def deprocess_image(self, x):
+		import numpy as np
+		# normalize tensor: center on 0., ensure std is 0.1
+		x -= x.mean()
+		x /= (x.std() + 1e-5)
+		x *= 0.1
+
+		#clip to [0, 1]
+		x += 0.5
+		x = np.clip(x, 0, 1)
+
+		#convert to RGB array
+		x *= 255
+		#x = x.transpose((1, 2, 0))
+		x = np.clip(x, 0, 255).astype('uint8')
+		return x
+
 	#creates an immage and appends it to the main content frame
 	def showImage(self, img, row = 1, col = 1, button=False, lambda_f=None):
-		photo = ImageTk.PhotoImage(img)
+		#img = self.deprocess_image(img)
+		#plt.imshow(img)
+		#plt.show()
+		photo = ImageTk.PhotoImage(img)#, 'F')
 		if(button):
 			widget = Button(self.frame, image=photo, width=img.size[0], height=img.size[1], borderwidth=2, state='normal', padx=0, pady=0, highlightthickness=0, command=lambda_f)
 		else:
@@ -192,7 +226,7 @@ class VCNN(Frame):
 		return widget
 
 	#display the activation of a layer
-	def displayActivtions(self, activation_maps, layer_name=None):
+	def displayActivtions(self, activation_maps, layer_name):
 		import numpy as np
 		import matplotlib.pyplot as plt
 		import os
@@ -203,7 +237,6 @@ class VCNN(Frame):
 			self.master.title('VCNN: '+layer_name)
 
 		imgs = get_activations_images(self.model, activation_maps, layer_name, window=[self.winfo_width(), self.winfo_height()], cmap=self.cmap)
-
 		batch_size = activation_maps[0].shape[0]
 		assert batch_size == 1, 'One image at a time to visualize.'
 
@@ -223,7 +256,7 @@ class VCNN(Frame):
 	#loads a layer and displays the activation
 	def loadLayer(self, layer_name):
 		self.last_loaded_layer = layer_name
-		activations = get_activations(self.model, self.network_input, layer_name)
+		activations = get_activations(self.model, self.network_input, layer_name=layer_name)
 		self.displayActivtions(activations, layer_name)
 
 	#load the model
@@ -237,6 +270,9 @@ class VCNN(Frame):
 		if(self.h5 == ''):
 			mbox.showerror("Error", "Please import the H5 file")
 			return
+
+		if(self.model != None):
+			self.last_loaded_layer = ''
 
 		self.model = load_model(self.json, self.h5)
 
