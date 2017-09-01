@@ -25,7 +25,7 @@ from pylab import cm
 import matplotlib.pyplot as plt
 
 from VCNN.Webcam import cam_shot
-from VCNN.Core import get_network_input, summary, load_model, get_activations, max_activation, get_activations_images, get_input_shape
+from VCNN.Core import get_network_input, summary, load_model, get_activations, max_activation, get_activations_images, get_input_shape, get_filter
 from VCNN.ImageTools import array_to_image
 
 
@@ -35,6 +35,7 @@ class VCNN(Frame):
 	h5 = ''
 	json = ''
 	image = ''
+	npy = ''
 	model = None
 	layersMenu = None
 	cmap = 'default'
@@ -76,6 +77,7 @@ class VCNN(Frame):
 		submenu.add_command(label="Json", command=self.loadJson)
 		submenu.add_command(label="H5", command=self.loadH5)
 		submenu.add_command(label="Image", command=self.loadImage)
+		submenu.add_command(label="npy", command=self.loadnpy)
 
 		#menu file
 		fileMenu.add_cascade(label='Import', menu=submenu)
@@ -163,6 +165,7 @@ class VCNN(Frame):
 			return
 
 		txt = summary(self.model)
+		self.model.summary()
 
 		mbox.showinfo("Summary", txt)
 
@@ -174,11 +177,18 @@ class VCNN(Frame):
 			return
 
 		#check if the input impage is loaded
-		if(self.image == ''):
-			mbox.showerror("Error", "Please import an adeguate image file")
+		if((self.image == '' and self.npy == '') or (self.image != '' and self.npy != '')):
+			mbox.showerror("Error", "Please import an adeguate input file")
 			return
 
-		self.network_input = get_network_input(self.model, self.image)
+		if(self.image == '' and self.npy != ''):
+			self.network_input = np.load(self.npy)
+		elif(self.image != '' and self.npy == ''):
+			self.network_input = get_network_input(self.model, self.image)
+
+
+		print(self.network_input.shape)
+
 
 		self.reload_layer()
 
@@ -209,13 +219,16 @@ class VCNN(Frame):
 		return x
 
 	#creates an immage and appends it to the main content frame
-	def showImage(self, img, row = 1, col = 1, button=False, lambda_f=None):
+	def showImage(self, img, row = 1, col = 1, button=False, lambda_l=None, lambda_r=None):
 		#img = self.deprocess_image(img)
 		#plt.imshow(img)
 		#plt.show()
 		photo = ImageTk.PhotoImage(img)#, 'F')
 		if(button):
-			widget = Button(self.frame, image=photo, width=img.size[0], height=img.size[1], borderwidth=2, state='normal', padx=0, pady=0, highlightthickness=0, command=lambda_f)
+			widget = Button(self.frame, image=photo, width=img.size[0], height=img.size[1], borderwidth=2, state='normal', padx=0, pady=0, highlightthickness=0)#, command=lambda_f)
+
+			widget.bind('<Button-1>', lambda event, lambda_l=lambda_l: lambda_l())
+			widget.bind('<Button-3>', lambda event, lambda_r=lambda_r: lambda_r())
 		else:
 			widget = Label(self.frame, image=photo, width=img.size[0], height=img.size[1], borderwidth=2, state='normal', padx=0, pady=0, highlightthickness=0)
 		widget.image = photo
@@ -248,8 +261,9 @@ class VCNN(Frame):
 				row += 1
 
 			if len(imgs) > 1:
-				lambda_f = lambda name_layer=layer_name, index_filter=i: self.maxActivation(name_layer, index_filter)
-				self.showImage(img, row, col, button=True, lambda_f=lambda_f)
+				lambda_l = lambda name_layer=layer_name, index_filter=i: self.maxActivation(name_layer, index_filter)
+				lambda_r = lambda name_layer=layer_name, index_filter=i: self.getFilter(name_layer, index_filter)
+				self.showImage(img, row, col, button=True, lambda_l=lambda_l, lambda_r=lambda_r)
 			else:
 				self.showImage(img, row, col, button=False) #show single image
 
@@ -322,7 +336,22 @@ class VCNN(Frame):
 
 		if fl != '':
 			self.image = fl
+			self.npy = ''
 			mbox.showinfo("Info", "Image Loaded")
+			return 0
+		else:
+			mbox.showerror("Error", "Could not open file")
+
+	def loadnpy(self):
+		#show the file chooser dialog
+		ftypes = [('Numpy files', '*.npy'), ('All files', '*')]
+		dlg = filedialog.Open(self, filetypes = ftypes)
+		fl = dlg.show()
+
+		if fl != '':
+			self.npy = fl
+			self.image = ''
+			mbox.showinfo("Info", "Numpy Loaded")
 			return 0
 		else:
 			mbox.showerror("Error", "Could not open file")
@@ -334,6 +363,46 @@ class VCNN(Frame):
 		if(show):
 			plt.imshow(img.squeeze(), interpolation='None', cmap='gray')
 			plt.show()
+
+		return img
+
+	#show the filter
+	def getFilter(self, layer_name, filter_index, show=True):
+		if type(self.model.layers[0]) is keras.engine.topology.InputLayer:
+			first_layer = self.model.layers[1]
+		else:
+			first_layer = self.model.layers[0]
+
+		#if(first_layer.name == layer_name):
+			img = get_filter(self.model, layer_name, filter_index)
+		#else:
+		#	img = None
+
+
+		if(show and img != None):
+			shape = list(img.shape)
+
+			if(len(shape) > 2 and shape[2] > 1):
+				square_x = int(np.floor(np.sqrt(shape[2])))
+				square_y = square_x
+
+				if(square_x*square_y < shape[2]):
+					square_x += 1
+					square_y += 1
+
+				from matplotlib import gridspec
+				gs = gridspec.GridSpec(square_y, square_x)
+				fig = plt.figure()
+				for i in range(0, shape[2]):
+					# display original
+					#ax = plt.subplot(i, 1)
+					ax = fig.add_subplot(gs[i])
+					data = img[:,:,i]
+					ax.imshow(data, 'gray')#, vmin=0, vmax=1)
+				plt.show()
+			else:
+				plt.imshow(img.squeeze(), interpolation='None', cmap='gray')
+				plt.show()
 
 		return img
 

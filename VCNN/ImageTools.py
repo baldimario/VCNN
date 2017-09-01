@@ -46,9 +46,9 @@ def array_to_image(myarray, cmap='default'):
 		return Image.fromarray(np.uint8(cm.Greens(myarray)*f))
 	elif(cmap == 'Blues'):
 		return Image.fromarray(np.uint8(cm.Blues(myarray)*f))
-	elif(cmap == 'Viridis'):
-		return Image.fromarray(np.uint8(cm.Viridis(myarray)*f))
+	elif(cmap == 'viridis'):
+		return Image.fromarray(np.uint8(cm.viridis(myarray)*f))
 	elif(cmap == 'default'):
 		return Image.fromarray(np.uint8(myarray*f))
-	else:
-		return Image.fromarray(np.uint8(cm.gray(myarray)*f))
+	#else:
+	#	return Image.fromarray(np.uint8(cm.gray(myarray)*f))

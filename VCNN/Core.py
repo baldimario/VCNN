@@ -31,14 +31,24 @@ def get_network_input(model, image):
 	lis = list(input_shape)
 
 	if(input_data.shape != input_shape):
-		input_data = np.reshape(input_data, (lis[1], lis[2], lis[3]))
+		print('input_data.shape',input_data.shape)
+		print('input_shape',input_shape)
+		print('len(input_shape)',len(lis))
+		if(len(lis) < 3):
+			input_data = np.reshape(input_data, (lis[1]))
+		else:
+			input_data = np.reshape(input_data, (lis[1], lis[2], lis[3]))
 
 	#if the image is grayscale get only the first channel (R=G=B)
 	if(is_grey_scale(image)):
-		input_data = input_data[:,:,0]
+		if(len(lis) > 2):
+			input_data = input_data[:,:,0]
 
 	#reshape the loaded image to fit the neural network's input dimensions
-	network_input = np.reshape(input_data, (1, input_shape[1], input_shape[2], input_shape[3]))
+	if(len(lis) < 3):
+		network_input = np.reshape(input_data, (1, input_shape[1]))
+	else:
+		network_input = np.reshape(input_data, (1, input_shape[1], input_shape[2], input_shape[3]))
 
 	return network_input
 
@@ -142,19 +152,18 @@ def get_activations(model, model_inputs, print_shape_only=True, layer_name=None)
 		activations.append(layer_activations)
 
 		print('LAS', layer_activations.shape)
+
+		import numpy as np
+		import matplotlib.pyplot as plt
+
+		shape = list(layer_activations.shape)
+		if(len(shape) > 2):
+			layer_activations = np.reshape(layer_activations[:,:,:,0], (shape[1], shape[2]))
+		#	plt.imshow(layer_activations),
+		#	plt.show()
+
 		if print_shape_only:
-			la = layer_activations
-			las = list(layer_activations.shape)
-			import numpy as np
-			la = np.reshape(la, (las[1], las[2], las[3]))
-
-			for i in range(0, las[3]):
-				a = la[:,:,i]
-
-				import matplotlib.pyplot as plt
-				plt.imshow(a)
-				plt.show()
-
+			print(layer_activations.shape)
 		else:
 			print(layer_activations)
 	return activations
@@ -247,3 +256,25 @@ def get_activations_images(model, activation_maps, layer_name, window=[600, 600]
 				imgs.append(img)
 
 	return imgs
+
+#get a specific filter of a layer
+#only first layer works [FIX!!]
+def get_filter(model, layer_name, filter_index):
+	import numpy as np
+	layer_dict = dict([(layer.name, layer) for layer in model.layers])
+
+	layer = layer_dict[layer_name]
+
+	weights = layer.get_weights()[0]
+
+	weights = np.asarray(weights)
+
+	shape = list(weights.shape)
+	print(weights.shape)
+
+	filt = weights[:,:,:,filter_index]
+
+	if(shape[2] == 1):
+		filt = np.reshape(filt, (shape[0], shape[1]))
+
+	return filt
