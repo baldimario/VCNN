@@ -44,7 +44,7 @@ class VCNN(Frame):
 	frame = None
 	menubar = None
 	network_input = None
-	debug = True
+	debug = False
 	streamcam = None
 
 	def __init__(self):
@@ -113,12 +113,19 @@ class VCNN(Frame):
 		cmapMenu.add_command(label='Default', command=lambda: self.setCmap('default'))
 		menubar.add_cascade(label='Cmap', menu=cmapMenu)
 
+		aboutMenu = Menu(menubar)
+		aboutMenu.add_command(label='Info', command=lambda: self.aboutAlert())
+		menubar.add_cascade(label='About', menu=aboutMenu)
+
 		#globalize the main menubar
 		self.menubar = menubar
 
 		if(self.debug):
 			self.loadModel(silent=True)
 			self.run(silent=True)
+
+	def aboutAlert(self):
+		mbox.showinfo("Info", "Developer: Mario Baldi\nLicense: GPL\nInfo: Developed for the purpose of the thesis session of 11//10/2017")
 
 	#webacm callback, it uses opencv to take a photo, square crop at center and resize as the input shape
 	def camShot(self, mirror = True):
@@ -374,7 +381,7 @@ class VCNN(Frame):
 			first_layer = self.model.layers[0]
 
 		#if(first_layer.name == layer_name):
-			img = get_filter(self.model, layer_name, filter_index)
+		img = get_filter(self.model, layer_name, filter_index)
 		#else:
 		#	img = None
 
